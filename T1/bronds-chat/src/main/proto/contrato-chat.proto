@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+package elc1018.grpc.chat;
+
+import "google/protobuf/timestamp.proto";
+
+option java_multiple_files = true;
+option java_package = "elc1018.grpc.chat.protos";
+option java_outer_classname = "ChatProtos";
+
+service ChatService {
+
+  rpc Register(User) returns (RegisterResponse);
+
+  rpc SendMessage(ChatMessage) returns (Ack);
+
+  rpc ReceiveMessages(User) returns (stream ChatMessage);
+}
+
+message User {
+  string username = 1;
+}
+
+message ChatMessage {
+  string from = 1;
+  string content = 2;
+  google.protobuf.Timestamp timestamp = 3;
+}
+
+message RegisterResponse {
+  bool success = 1;
+  string username = 2;
+}
+
+message Ack {
+  bool success = 1;
+}
