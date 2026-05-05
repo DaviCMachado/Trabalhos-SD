@@ -1,6 +1,10 @@
 # kr-chat
 
-Implementação do Trabalho 1 de Sistemas Distribuídos: um chat em Java com gRPC e Protocol Buffers, seguindo o contrato definido em `src/main/proto/contrato-chat.proto`.
+Implementação do Trabalho 1 de Sistemas Distribuídos: chat em Java usando gRPC e Protocol Buffers. O projeto segue o contrato definido em `src/main/proto/contrato-chat.proto`.
+
+## Resumo
+
+Aplicação de chat com um servidor central que mantém uma única sala. Usuários registram-se com nomes únicos, enviam mensagens que são transmitidas a todos os participantes, e recebem mensagens por meio de um stream contínuo.
 
 ## Requisitos
 
@@ -9,142 +13,149 @@ Implementação do Trabalho 1 de Sistemas Distribuídos: um chat em Java com gRP
 
 ## Build
 
+Compile o projeto com:
+
 ```bash
 mvn compile
 ```
 
-O Maven gera automaticamente as classes Java a partir do arquivo `.proto` durante a compilação.
+O plugin protobuf do Maven gera automaticamente as classes Java a partir de `src/main/proto/contrato-chat.proto`.
 
 ## Execução
 
-Inicie o servidor:
+Iniciar o servidor:
 
 ```bash
-mvn exec:java -Dexec.mainClass="kiri.chat.Main" -Dexec.args="server 50051"
+mvn "exec:java" "-Dexec.mainClass=kiri.chat.Main" "-Dexec.args=server 50051"
 ```
 
-Ou, se preferir executar a classe principal diretamente após compilar:
+Executar um cliente (ex.: `alice`):
 
 ```bash
-java -cp target/classes;target/generated-sources/protobuf/java;target/generated-sources/protobuf/grpc kiri.chat.Main server 50051
-```
-
-Inicie um cliente:
-
-```bash
-mvn exec:java -Dexec.mainClass="kiri.chat.Main" -Dexec.args="client alice localhost 50051"
-```
-
-Ou diretamente:
-
-```bash
-java -cp target/classes;target/generated-sources/protobuf/java;target/generated-sources/protobuf/grpc kiri.chat.Main client alice localhost 50051
+mvn "exec:java" "-Dexec.mainClass=kiri.chat.Main" "-Dexec.args=client alice localhost 50051"
 ```
 
 ## Uso
 
-- O primeiro argumento define o modo: `server` ou `client`.
-- No cliente, o primeiro parâmetro após `client` é o `username`.
-- Use `/exit` para encerrar a sessão do cliente.
+- Modo: `server` ou `client`.
+- No cliente, o primeiro argumento após `client` é o `username`.
+- Comandos suportados:
+   - `/exit` : encerra a sessão do cliente (gera notificação de saída para os demais).
+   - `/list` : exibe usuários online (retorna mensagem privada do servidor).
 
-## Roteiro rapido de teste
+## Testes automatizados
 
-1. Rode os testes automatizados:
+Os testes unitários estão em `src/test/java/kiri/chat` e cobrem os cenários principais (registro, envio, stream, notificações e validações adicionadas de timestamp e ordem por remetente).
 
-```bash
-mvn test
-```
-
-2. Inicie o servidor em um terminal:
-
-```bash
-java -cp target/classes;target/generated-sources/protobuf/java;target/generated-sources/protobuf/grpc kiri.chat.Main server 50051
-```
-
-3. Inicie dois clientes em terminais separados:
-
-```bash
-java -cp target/classes;target/generated-sources/protobuf/java;target/generated-sources/protobuf/grpc kiri.chat.Main client alice localhost 50051
-```
-
-```bash
-java -cp target/classes;target/generated-sources/protobuf/java;target/generated-sources/protobuf/grpc kiri.chat.Main client bob localhost 50051
-```
-
-4. Validacoes esperadas:
-- Bob deve receber mensagem `SYSTEM` informando que entrou na sala.
-- Mensagens enviadas por Alice devem aparecer para Bob (e vice-versa).
-- Se tentar abrir outro cliente com username repetido, o registro deve falhar.
-- Ao usar `/exit` em um cliente, o outro deve receber mensagem `SYSTEM` de saida.
-
-## Script de apresentacao (2 minutos)
-
-1. Fala inicial (10s):
-- "Este projeto implementa um chat distribuido com gRPC e Protocol Buffers, com registro unico de usuarios e recebimento por stream."
-
-2. Validacao automatizada (15s):
+Executar:
 
 ```bash
 mvn test
 ```
 
-- "Aqui eu valido os cenarios principais automaticamente: registro, envio e stream."
+## Pipeline de Validação das RFAs
 
-3. Subir servidor (15s):
+Apresentamos comandos para validar cada Requisito Funcional Absoluto (RFA) de forma objetiva.
 
+Passo 0 — Preparação
+
+```bash
+# Compilar e gerar fontes protobuf
+mvn compile
+
+# Executar todos os testes automatizados (cobertura principal)
+mvn test
+```
+
+RFA01 — Registro com nome único
+
+Automático:
+```bash
+mvn -Dtest=ChatServiceImplTest#registerRejectsDuplicateUsers test
+```
+
+Manual (alternativa):
+1. Iniciar servidor:
 ```bash
 java -cp target/classes;target/generated-sources/protobuf/java;target/generated-sources/protobuf/grpc kiri.chat.Main server 50051
 ```
-
-- "Servidor iniciado na porta 50051."
-
-4. Abrir cliente 1 (15s):
-
+2. Abrir dois clientes em terminais distintos:
 ```bash
 java -cp target/classes;target/generated-sources/protobuf/java;target/generated-sources/protobuf/grpc kiri.chat.Main client alice localhost 50051
+java -cp target/classes;target/generated-sources/protobuf/java;target/generated-sources/protobuf/grpc kiri.chat.Main client alice localhost 50051
 ```
+Resultado esperado: o segundo registro deve falhar.
 
-- "Alice entrou no chat."
+RFA02 — Uma única sala (escopo global)
 
-5. Abrir cliente 2 (15s):
+Manual: iniciar servidor e conectar 3 clientes; enviar mensagem de um cliente e confirmar que todos os demais recebem a mesma mensagem.
 
+RFA03 — Broadcast de mensagens
+
+Automático:
 ```bash
-java -cp target/classes;target/generated-sources/protobuf/java;target/generated-sources/protobuf/grpc kiri.chat.Main client bob localhost 50051
+mvn -Dtest=ChatServiceImplTest#receiveMessagesStreamsBroadcastsForRegisteredUser test
 ```
 
-- "Bob entrou e o sistema notifica entrada por mensagem SYSTEM."
+Manual: use o mesmo fluxo do RFA02 e valide que mensagens de um remetente são recebidas pelos outros.
 
-6. Troca de mensagens (30s):
-- No terminal da Alice, enviar: `oi bob`.
-- Mostrar no terminal do Bob a mensagem recebida.
-- No terminal do Bob, responder: `oi alice`.
-- Mostrar no terminal da Alice a resposta.
+RFA04 — Timestamp em `ChatMessage`
 
-7. Regra de nome unico (10s):
-- Tentar abrir um terceiro cliente com `alice`.
-- "O registro falha porque o username precisa ser unico."
+Automático:
+```bash
+mvn -Dtest=ChatServiceImplTest#chatMessageContainsTimestamp test
+```
 
-8. Encerramento limpo (10s):
-- Em um cliente, executar `/exit`.
-- "O outro cliente recebe mensagem SYSTEM de saida."
+Manual: enviar mensagem e verificar que a mensagem recebida contém um `timestamp` válido.
 
-9. Fechamento (10s):
-- "Fluxo completo validado: registro, envio, stream, notificacoes de sistema e saida limpa."
+RFA05 — Stream contínuo (entrega em tempo real)
 
-## Cola de prova (8 linhas)
+Automático: coberto pelo mesmo teste de broadcast
+```bash
+mvn -Dtest=ChatServiceImplTest#receiveMessagesStreamsBroadcastsForRegisteredUser test
+```
 
-1. `mvn test` -> "Valida registro, envio e stream automaticamente."
-2. `java -cp target/classes;target/generated-sources/protobuf/java;target/generated-sources/protobuf/grpc kiri.chat.Main server 50051` -> "Servidor no ar."
-3. `java -cp target/classes;target/generated-sources/protobuf/java;target/generated-sources/protobuf/grpc kiri.chat.Main client alice localhost 50051` -> "Alice conectada."
-4. `java -cp target/classes;target/generated-sources/protobuf/java;target/generated-sources/protobuf/grpc kiri.chat.Main client bob localhost 50051` -> "Bob conectou e recebeu SYSTEM."
-5. Alice envia `oi bob` -> "Bob recebe no stream."
-6. Bob responde `oi alice` -> "Alice recebe no stream."
-7. Tentar cliente com username `alice` de novo -> "Registro rejeitado (nome unico)."
-8. Em um cliente, `/exit` -> "Outro cliente recebe SYSTEM de saida."
+RFA06 — Ordem por remetente preservada
+
+Automático:
+```bash
+mvn -Dtest=ChatServiceImplTest#messagesPreserveOrderBySender test
+```
+
+Manual: enviar uma sequência de mensagens de um remetente e confirmar que os receptores recebem na mesma ordem.
+
+RFA07 — Notificações `SYSTEM` de entrada/saída
+
+Automático:
+```bash
+mvn -Dtest=ChatRoomTest#leaveBroadcastsToRemainingSessions test
+```
+
+Manual: conectar e desconectar clientes; validar mensagens `SYSTEM` anunciando entrada e saída.
+
+
+## Cobertura de RFAs (Requisitos Funcionais Absolutos)
+
+| RFA | Descrição | Teste Automático | Teste Manual |
+|-----|-----------|-----------------|--------------|
+| **RFA01** | Registro com nome único; rejeita duplicatas | `ChatServiceImplTest.registerRejectsDuplicateUsers` | Tentar conectar dois clientes com o mesmo username |
+| **RFA02** | Uma única sala criada pelo servidor | Implícito nos testes | Todos os clientes veem as mesmas mensagens |
+| **RFA03** | Mensagens encaminhadas a todos os usuários | `ChatServiceImplTest.receiveMessagesStreamsBroadcastsForRegisteredUser`<br>`ChatRoomTest.leaveBroadcastsToRemainingSessions` | Enviar mensagem de um cliente e validar recepção nos demais |
+| **RFA04** | `ChatMessage` com `from`, `content`, `timestamp` | `ChatServiceImplTest.chatMessageContainsTimestamp` | Verificar que cada mensagem contém timestamp válido |
+| **RFA05** | Stream contínuo para entrega em tempo real | `ChatServiceImplTest.receiveMessagesStreamsBroadcastsForRegisteredUser` | Mensagens chegam enquanto o cliente está conectado |
+| **RFA06** | Ordem por remetente preservada | `ChatServiceImplTest.messagesPreserveOrderBySender` | Enviar sequência de mensagens por um remetente e validar ordem de chegada |
+| **RFA07** | Notificações de entrada/saída (SYSTEM) | `ChatRoomTest.leaveBroadcastsToRemainingSessions` | Conectar/Desconectar e validar mensagens `SYSTEM` |
 
 ## Comportamento implementado
 
-- Registro de usuários com nome único via chamada unary `Register`.
-- Envio de mensagens via `SendMessage`.
+- Registro de usuários com nome único via RPC `Register`.
+- Envio de mensagens via RPC `SendMessage`.
 - Recebimento de mensagens por stream em `ReceiveMessages`.
 - Notificações de entrada e saída da sala enviadas como mensagens `SYSTEM`.
+- Resposta a comandos `/list` e `/exit`.
+- `ChatMessage` inclui `timestamp` e a implementação preserva ordem por remetente.
+
+## Observações
+
+- Os arquivos gerados a partir de `.proto` ficam em `target/generated-sources` e não devem ser editados manualmente.
+- Para qualquer ajuste ou demonstração adicional, os testes em `src/test/java` fornecem exemplos de uso da API.

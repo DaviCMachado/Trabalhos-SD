@@ -17,6 +17,7 @@ import java.util.concurrent.CountDownLatch;
 
 public class ChatClient {
     public static void main(String[] args) {
+        // Validação mínima dos argumentos de execução do cliente.
         if (args.length < 1) {
             System.out.println("Uso: client <username> [host] [port]");
             return;
@@ -26,6 +27,7 @@ public class ChatClient {
         String host = args.length > 1 ? args[1] : "localhost";
         int port = args.length > 2 ? Integer.parseInt(args[2]) : 50051;
 
+        // Canal direto e sem TLS para simplificar a comunicação local do trabalho.
         ManagedChannel channel = ManagedChannelBuilder.forAddress(host, port)
                 .usePlaintext()
                 .build();
@@ -41,6 +43,7 @@ public class ChatClient {
             ChatServiceGrpc.ChatServiceStub asyncStub = ChatServiceGrpc.newStub(channel);
             CountDownLatch done = new CountDownLatch(1);
 
+            // Observer que imprime no console cada mensagem recebida do stream.
             StreamObserver<ChatMessage> receiveObserver = new StreamObserver<>() {
                 @Override
                 public void onNext(ChatMessage value) {
@@ -59,6 +62,7 @@ public class ChatClient {
                 }
             };
 
+            // Abre o stream de recebimento antes de começar a ler a entrada do usuário.
             asyncStub.receiveMessages(User.newBuilder().setUsername(username).build(), receiveObserver);
             System.out.println("Conectado como " + username + ". Digite mensagens e pressione Enter. Use /exit para sair. Use /list para listar usuarios online.");
 
@@ -81,7 +85,8 @@ public class ChatClient {
                         continue;
                     }
 
-                    Ack ack = blockingStub.sendMessage(ChatMessage.newBuilder()
+                        // Mensagens normais seguem para o servidor com timestamp preenchido no cliente.
+                        Ack ack = blockingStub.sendMessage(ChatMessage.newBuilder()
                             .setFrom(username)
                             .setContent(line)
                             .setTimestamp(toTimestamp(Instant.now()))
@@ -100,6 +105,7 @@ public class ChatClient {
     }
 
     private static String format(ChatMessage message) {
+        // Formata a mensagem recebida com horário local para facilitar a leitura no console.
         java.time.Instant instant = java.time.Instant.ofEpochSecond(message.getTimestamp().getSeconds());
         java.time.ZonedDateTime horarioBrasilia = instant.atZone(java.time.ZoneId.of("America/Sao_Paulo"));
         java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss");
@@ -108,6 +114,7 @@ public class ChatClient {
     }
 
     private static com.google.protobuf.Timestamp toTimestamp(Instant instant) {
+        // Converte Instant para Timestamp protobuf sem perda de precisão relevante.
         return com.google.protobuf.Timestamp.newBuilder()
                 .setSeconds(instant.getEpochSecond())
                 .setNanos(instant.getNano())

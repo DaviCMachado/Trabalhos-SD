@@ -7,12 +7,15 @@ import java.io.IOException;
 
 public class ChatServer {
     public static void main(String[] args) {
+    // Porta configurável para permitir execução local ou em ambiente remoto.
         int port = args.length > 0 ? Integer.parseInt(args[0]) : 50051;
 
+    // O servidor expõe apenas a implementação do serviço de chat.
         Server server = ServerBuilder.forPort(port)
                 .addService(new ChatServiceImpl())
                 .build();
 
+    // Garante encerramento limpo quando a JVM finalizar.
         Runtime.getRuntime().addShutdownHook(new Thread(server::shutdown));
 
         try {
