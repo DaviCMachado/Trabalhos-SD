@@ -9,6 +9,9 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingQueue;
 
+import java.util.Set;
+
+
 public class ChatRoom {
     private final Map<String, ClientSession> sessions = new ConcurrentHashMap<>();
 
@@ -23,12 +26,23 @@ public class ChatRoom {
         broadcast(new ChatMessageEnvelope(from, content, Instant.now()));
     }
 
+    public void sendPrivateMessage(String to, String from, String content) {
+        ClientSession session = sessions.get(to);
+        if (session != null) {
+            session.enqueue(toProto(new ChatMessageEnvelope(from, content, Instant.now())));
+        }
+    }
+
     public synchronized void leave(String username) {
         ClientSession session = sessions.remove(username);
         if (session != null) {
             session.stop();
             broadcast(systemMessage(username + " saiu da sala"));
         }
+    }
+
+    public Set<String> getOnlineUsers() {
+        return Set.copyOf(sessions.keySet());
     }
 
     private void broadcast(ChatMessageEnvelope envelope) {

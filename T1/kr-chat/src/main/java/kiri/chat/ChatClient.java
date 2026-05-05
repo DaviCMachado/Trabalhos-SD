@@ -60,13 +60,25 @@ public class ChatClient {
             };
 
             asyncStub.receiveMessages(User.newBuilder().setUsername(username).build(), receiveObserver);
-            System.out.println("Conectado como " + username + ". Digite mensagens e pressione Enter. Use /exit para sair.");
+            System.out.println("Conectado como " + username + ". Digite mensagens e pressione Enter. Use /exit para sair. Use /list para listar usuarios online.");
 
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(System.in))) {
                 while (true) {
                     String line = reader.readLine();
                     if (line == null || "/exit".equalsIgnoreCase(line.trim())) {
+                        blockingStub.sendMessage(ChatMessage.newBuilder()
+                            .setFrom(username)
+                            .setContent("/exit")
+                            .build());
                         break;
+                    }
+
+                    if("/list".equalsIgnoreCase(line.trim())){
+                        blockingStub.sendMessage(ChatMessage.newBuilder()
+                            .setFrom(username)
+                            .setContent("/list")
+                            .build());
+                        continue;
                     }
 
                     Ack ack = blockingStub.sendMessage(ChatMessage.newBuilder()
@@ -88,7 +100,11 @@ public class ChatClient {
     }
 
     private static String format(ChatMessage message) {
-        return "[" + message.getTimestamp().getSeconds() + "] " + message.getFrom() + ": " + message.getContent();
+        java.time.Instant instant = java.time.Instant.ofEpochSecond(message.getTimestamp().getSeconds());
+        java.time.ZonedDateTime horarioBrasilia = instant.atZone(java.time.ZoneId.of("America/Sao_Paulo"));
+        java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss");
+
+        return "[" + horarioBrasilia.format(formatter) + "] " + message.getFrom() + ": " + message.getContent();
     }
 
     private static com.google.protobuf.Timestamp toTimestamp(Instant instant) {

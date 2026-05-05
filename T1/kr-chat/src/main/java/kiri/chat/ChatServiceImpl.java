@@ -19,7 +19,7 @@ public class ChatServiceImpl extends ChatServiceGrpc.ChatServiceImplBase {
 
     @Override
     public void register(User request, StreamObserver<RegisterResponse> responseObserver) {
-        String username = request.getUsername();
+        String username = request.getUsername().trim();
         boolean success = username != null && !username.isBlank() && registeredUsers.add(username);
 
         responseObserver.onNext(RegisterResponse.newBuilder()
@@ -32,8 +32,16 @@ public class ChatServiceImpl extends ChatServiceGrpc.ChatServiceImplBase {
     @Override
     public void sendMessage(ChatMessage request, StreamObserver<Ack> responseObserver) {
         boolean knownUser = registeredUsers.contains(request.getFrom());
-        if (knownUser) {
-            chatRoom.broadcastUserMessage(request.getFrom(), request.getContent());
+        if(knownUser){
+            if("/list".equalsIgnoreCase(request.getContent().trim())){
+                String lista = "Usuários online: " + String.join(", ", chatRoom.getOnlineUsers());
+                chatRoom.sendPrivateMessage(request.getFrom().trim(), "Sistema", lista);
+            }else if("/exit".equalsIgnoreCase(request.getContent().trim())){
+                chatRoom.leave(request.getFrom().trim());
+                registeredUsers.remove(request.getFrom().trim());
+            } else {
+                chatRoom.broadcastUserMessage(request.getFrom().trim(), request.getContent().trim());
+            }
         }
 
         responseObserver.onNext(Ack.newBuilder().setSuccess(knownUser).build());
@@ -42,7 +50,7 @@ public class ChatServiceImpl extends ChatServiceGrpc.ChatServiceImplBase {
 
     @Override
     public void receiveMessages(User request, StreamObserver<ChatMessage> responseObserver) {
-        String username = request.getUsername();
+        String username = request.getUsername().trim();
         if (!registeredUsers.contains(username)) {
             responseObserver.onError(new IllegalArgumentException("User not registered: " + username));
             return;
@@ -53,7 +61,6 @@ public class ChatServiceImpl extends ChatServiceGrpc.ChatServiceImplBase {
 
         chatRoom.join(username, responseObserver);
         serverObserver.setOnCancelHandler(() -> {
-            chatRoom.leave(username);
             disconnected.countDown();
         });
 
@@ -62,6 +69,7 @@ public class ChatServiceImpl extends ChatServiceGrpc.ChatServiceImplBase {
         } catch (InterruptedException interruptedException) {
             Thread.currentThread().interrupt();
         } finally {
+            registeredUsers.remove(username); 
             chatRoom.leave(username);
         }
     }
