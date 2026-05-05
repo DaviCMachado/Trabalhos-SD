@@ -1,0 +1,112 @@
+@startuml kr-chat-architecture
+
+' Definições de estilo
+skinparam backgroundColor #FEFEFE
+skinparam classBackgroundColor #E8F4F8
+skinparam classBorderColor #2E5090
+skinparam arrowColor #2E5090
+skinparam shadowing false
+
+' Pacote principal
+package "kiri.chat" {
+
+    ' Classes principais
+    class Main {
+        + {static} main(String[] args) : void
+        - router(String mode, String[] args) : void
+    }
+
+    class ChatServer {
+        - port: int
+        - server: Server
+        + ChatServer(int port)
+        + start() : void
+        + stop() : void
+    }
+
+    class ChatClient {
+        - host: String
+        - port: int
+        - channel: ManagedChannel
+        + ChatClient(String host, int port)
+        + register(String username) : void
+        + sendMessage(String message) : void
+        + receiveMessages() : void
+        - formatMessage(ChatMessage msg) : String
+    }
+
+    class ChatServiceImpl {
+        - registeredUsers: Set<String>
+        - chatRoom: ChatRoom
+        + register(RegisterRequest, StreamObserver) : void
+        + sendMessage(ChatMessage, StreamObserver) : void
+        + receiveMessages(Empty, StreamObserver) : void
+        - validateUsername(String) : void
+    }
+
+    class ChatRoom {
+        - {static} instance: ChatRoom
+        - sessions: Map<String, ClientSession>
+        + {static} getInstance() : ChatRoom
+        + join(String username) : ClientSession
+        + broadcastUserMessage(ChatMessageEnvelope) : void
+        + leave(String username) : void
+        - broadcast(ChatMessage) : void
+    }
+
+    class ChatMessageEnvelope {
+        - from: String
+        - content: String
+        - timestamp: Instant
+        + ChatMessageEnvelope(String, String, Instant)
+    }
+
+    class ClientSession {
+        - username: String
+        - messageQueue: BlockingQueue<ChatMessage>
+        - streamObserver: ServerCallStreamObserver
+        + ClientSession(String, ServerCallStreamObserver)
+        + sendMessage(ChatMessage) : void
+        + cancel() : void
+    }
+
+    ' Interfaces/Abstratos
+    interface StreamObserver<T> {
+        + onNext(T) : void
+        + onError(Throwable) : void
+        + onCompleted() : void
+    }
+
+}
+
+' Relações
+Main --> ChatServer : spawns
+Main --> ChatClient : spawns
+ChatServer --> ChatServiceImpl : implements
+ChatServiceImpl --> ChatRoom : manages
+ChatServiceImpl --> ChatMessageEnvelope : creates
+ChatRoom --> ClientSession : manages
+ChatRoom --> ChatMessageEnvelope : broadcasts
+ClientSession --> StreamObserver : uses
+ChatClient --> StreamObserver : implements
+
+' Padrões utilizados
+note right of ChatRoom
+  **Singleton Pattern**
+  Garante única instância
+  para toda a aplicação
+end note
+
+note right of ClientSession
+  **Daemon Thread Pattern**
+  Thread executa continuamente
+  entregando mensagens
+end note
+
+note right of ChatMessageEnvelope
+  **Data Transfer Object (DTO)**
+  Envelope interno antes
+  de serializar para protobuf
+end note
+
+@enduml
